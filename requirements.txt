@@ -1,8 +1,12 @@
 # Core: vision-language model + parameter-efficient fine-tuning
-transformers>=4.45.0
+#
+# transformers is capped below the next major: the Trainer API changes across
+# major releases, and an open-ended ">=" lets one land underneath the notebook.
+# Lower bounds say what you need, upper bounds say what you tested against.
+# Verified on 4.x and 5.x; 5.x renamed warmup_ratio, which the notebook adapts to.
+transformers>=4.45.0,<6.0.0
 accelerate>=0.34.0
 peft>=0.13.0
-trl>=0.11.0
 bitsandbytes>=0.44.0          # 4-bit quantization (QLoRA) - needs a CUDA GPU
 qwen-vl-utils>=0.0.8          # image preprocessing helpers for Qwen2-VL
 datasets>=3.0.0
