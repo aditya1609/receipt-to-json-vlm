@@ -103,14 +103,23 @@ megapixel photos, so 400 of them decoded is several GB before a single weight
 has loaded, and the kernel dies during model loading rather than during
 training. That makes it look like a GPU problem when it is not.
 
-Two rules keep it in check, both applied in the data section:
+Three rules keep it in check, all applied in the data section:
 
 - **Downscale on ingest, not at use time.** The processor caps every image at
-  `MAX_PIXELS` (~448×448) regardless, so holding a 3000×4000 original costs
-  ~36 MB of RAM to deliver 0.2 MP of usable signal.
+  `MAX_PIXELS` (~448×448) regardless, so holding a full-size original costs
+  tens of MB of RAM to deliver 0.2 MP of usable signal.
+- **Store compressed, decode on demand.** A decoded PIL image is an
+  *uncompressed* buffer of width × height × 3 bytes — ~2.4 MB at 1024×768,
+  against ~150 KB as JPEG. Across ~440 receipts that is the difference between
+  roughly 1 GB and 70 MB. Decoding at the point of use costs a few milliseconds
+  per training step, which is free beside a forward pass through a 2B model.
 - **Never hold two copies.** Building a list of originals and then mapping over
   it to build a second list means both exist at once — peak usage is what kills
   the session, not steady state.
+
+The dataset is streamed rather than downloaded, too: only ~440 of roughly 1000
+rows are needed, and converting the full download to Arrow locally is itself a
+RAM spike unrelated to the rows we actually want.
 
 The notebook also pins the model to the GPU with `device_map={"": 0}` rather
 than `"auto"`. Given tight VRAM, `"auto"` may quietly offload layers to host
