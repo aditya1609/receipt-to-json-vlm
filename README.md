@@ -34,15 +34,54 @@ choice is harder — and more convincing — than showing that you can do it.
 
 ## 📊 Results
 
-*(Run the notebook, then paste your numbers here and drop in the chart it saves
-as `results_comparison.png`.)*
+Measured on 40 held-out CORD receipts — identical images, identical prompt,
+identical greedy decoding across all four rows.
 
-| Approach | Valid JSON | Total correct | Item name F1 | sec/receipt |
-|----------|-----------|---------------|--------------|-------------|
-| OCR + rules | | | | |
-| VLM zero-shot | | | | |
-| VLM few-shot | | | | |
-| **VLM + QLoRA** | | | | |
+![Results](results_comparison.png)
+
+| Approach | Valid JSON | Total correct | Item name F1 |
+|----------|-----------|---------------|--------------|
+| OCR + rules | 1.00* | 0.25 | 0.00 |
+| VLM zero-shot | 0.95 | 0.52 | 0.49 |
+| VLM few-shot | 1.00 | 0.70 | 0.49 |
+| **VLM + QLoRA** | **1.00** | **0.87** | **0.79** |
+
+\* Not a merit. The OCR baseline assembles its output with `json.dumps()`, so it
+is valid by construction — a reminder to check *how* a metric is produced before
+reading anything into it. The honest OCR result is the other two columns: it
+recovers a quarter of the totals and **not a single line item**. Tesseract reads
+the characters fine; it has no idea which number is a price and which is a phone
+number. That is a layout-and-semantics problem, and it is why a neural model
+earns its place here.
+
+### The most interesting number is the one that *didn't* move
+
+Few-shot prompting lifted total accuracy substantially (0.52 → 0.70) while item
+name F1 sat completely still (0.49 → 0.49).
+
+That is the whole argument for fine-tuning, visible in one row. Two examples in
+the prompt teach the model the *shape* of the answer — which is why totals and
+JSON validity improve — but they cannot teach it to read a cramped receipt more
+carefully. Formatting is cheap to demonstrate; perception is not.
+
+QLoRA is what moved perception: item name F1 went 0.49 → 0.79, a 61% relative
+gain, alongside totals reaching 0.87. So fine-tuning was not just *better*, it
+was better **at the thing prompting could not fix** — which is a far stronger
+justification than a single improved average.
+
+### Where these numbers are unfair
+
+Item names are scored by *exact* match after lowercasing and stripping
+punctuation. That is a deliberately strict choice — it makes the metric
+unambiguous and cheap to compute — but it means `"ES TEH MANIS"` against
+`"ES TEH"` scores zero rather than partial credit. The OCR baseline's flat 0.00
+is partly an artefact of that harshness: it does extract *text*, it just never
+reproduces a name exactly. A fuzzy criterion would give it some credit and
+narrow every gap in the table.
+
+The ranking would not change, which is why the comparison still stands. But a
+metric you cannot criticise is usually a metric you have not looked at closely
+enough.
 
 ---
 
@@ -229,8 +268,11 @@ Retry-on-failure is the simpler cousin and a useful thing to compare against.
 > Fine-tuned a 2B-parameter vision-language model with **QLoRA** to convert
 > receipt images into **schema-validated JSON**, training ~1% of parameters in
 > 4-bit on a single free GPU. Benchmarked against OCR, zero-shot and few-shot
-> baselines on a held-out set to justify fine-tuning; added Pydantic validation
-> with retry, per-field error analysis, and CI-tested extraction logic.
+> baselines on 40 held-out receipts: **line-item F1 0.49 → 0.79 and total
+> accuracy 0.52 → 0.87**, with few-shot prompting shown to improve formatting
+> but not extraction accuracy — isolating what fine-tuning actually contributed.
+> Added Pydantic validation with retry, per-field error analysis, and CI-tested
+> extraction logic.
 
 ## 🔭 Next steps
 
