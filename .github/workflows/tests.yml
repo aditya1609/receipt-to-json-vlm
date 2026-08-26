@@ -1,0 +1,30 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # Only the GPU-free logic is tested, so we skip the heavy ML stack
+      # entirely - this keeps CI to a few seconds instead of several minutes.
+      - name: Install test dependencies
+        run: python -m pip install --quiet pydantic pytest
+
+      - name: Run tests
+        run: python -m pytest tests -q
