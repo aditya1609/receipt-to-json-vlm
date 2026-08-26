@@ -95,6 +95,30 @@ Plus gradient checkpointing, an 8-bit optimizer, batch size 1 with gradient
 accumulation of 8, and a bounded `max_steps` so a Colab session cannot time out
 mid-run.
 
+### The memory budget people forget
+
+Fine-tuning discussions fixate on VRAM, but on Colab the **host RAM is the
+smaller budget** — roughly 12 GB against the T4's 15 GB. CORD receipts are 2–4
+megapixel photos, so 400 of them decoded is several GB before a single weight
+has loaded, and the kernel dies during model loading rather than during
+training. That makes it look like a GPU problem when it is not.
+
+Two rules keep it in check, both applied in the data section:
+
+- **Downscale on ingest, not at use time.** The processor caps every image at
+  `MAX_PIXELS` (~448×448) regardless, so holding a 3000×4000 original costs
+  ~36 MB of RAM to deliver 0.2 MP of usable signal.
+- **Never hold two copies.** Building a list of originals and then mapping over
+  it to build a second list means both exist at once — peak usage is what kills
+  the session, not steady state.
+
+The notebook also pins the model to the GPU with `device_map={"": 0}` rather
+than `"auto"`. Given tight VRAM, `"auto"` may quietly offload layers to host
+RAM, which turns a clean out-of-memory error into a run that is an order of
+magnitude slower *and* competes for the RAM the dataset needs. A `memory_report()`
+helper prints both budgets at each stage, so this is observable rather than
+guesswork.
+
 ---
 
 ## 📁 Project structure
@@ -129,6 +153,10 @@ edge cases — notebooks are a bad place for logic you want to trust.
 Takes roughly 45–60 minutes end to end. If the CORD dataset fails to download,
 the notebook generates synthetic receipts instead, so it never dead-ends during
 a live demo.
+
+**If Colab reports that the session restarted after the install cell, that is
+expected** — the install replaces library versions Colab had already imported.
+Run all again; the install is a no-op the second time.
 
 ### Tests (no GPU needed)
 
